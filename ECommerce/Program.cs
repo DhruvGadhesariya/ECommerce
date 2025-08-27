@@ -1,84 +1,132 @@
-using Common.AppSettings;
+﻿using System.Text;
 using Data.Data;
-using ECommerce.Middleware;
+using ECommerce.Middlewares;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Serilog;
 using Service.Implementation;
 using Service.Interfaces;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// --------------------
+// Logging: Serilog
+// --------------------
+builder.Host.UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configuration));
 
-builder.Services.AddControllers();
-builder.Services.Configure<JwtViewModel>(builder.Configuration.GetSection("JwtViewModel"));
-builder.Services.Configure<Imageurl>(builder.Configuration.GetSection("Imageurl"));
-builder.Services.AddDbContext<EcommercedbContext>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IProductService, ProductService>();
-builder.Services.AddScoped<ICompanyService, CompanyService>();
-builder.Services.AddScoped<ISupplierService, SupplierService>();
-builder.Services.AddScoped<IAdminApprovalService, AdminApprovalService>();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// --------------------
+// Add core services
+// --------------------
+builder.Services.AddControllers().AddNewtonsoftJson();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Ecom", Version = "v1" });
+    // Swagger security definition for JWT
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Description = "Please Enter Token",
+        In = ParameterLocation.Header,
+        Description = "Enter JWT token with Bearer prefix (Example: 'Bearer eyJhbGciOi...')",
         Name = "Authorization",
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
-        BearerFormat = "JWT",
-        Scheme = "bearer"
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
     });
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement {
+
+    // Enforce JWT authentication in Swagger UI
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
-        new OpenApiSecurityScheme
         {
-            Reference = new OpenApiReference
+            new OpenApiSecurityScheme
             {
-                Type=ReferenceType.SecurityScheme,
-                Id = "Bearer"
-            }
-        },
-        new string[] { }
-    }});
-});
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = false,
-            ValidIssuer = builder.Configuration["JwtViewModel:Issuer"],
-            ValidAudience = builder.Configuration["JwtViewModel:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtViewModel:Key"])),
-        };
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
     });
+});
+
+// --------------------
+// EF Core: Database Context
+// --------------------
+builder.Services.AddDbContext<EcommercedbContext>(opts =>
+    opts.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+
+// --------------------
+// Caching
+// --------------------
+builder.Services.AddMemoryCache();
+
+// --------------------
+// Dependency Injection: Services
+// --------------------
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+// --------------------
+// Authentication: JWT Bearer
+// --------------------
+var jwt = builder.Configuration.GetSection("Jwt");
+if (!string.IsNullOrEmpty(jwt["Key"]))
+{
+    var key = Encoding.UTF8.GetBytes(jwt["Key"]);
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.RequireHttpsMetadata = true;
+            options.SaveToken = true;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero,
+                ValidIssuer = jwt["Issuer"],
+                ValidAudience = jwt["Audience"],
+                IssuerSigningKey = new SymmetricSecurityKey(key)
+            };
+        });
+}
+
+// --------------------
+// CORS Policy
+// --------------------
+builder.Services.AddCors(o =>
+    o.AddPolicy("open", p => p
+        .WithOrigins("https://your-frontend.com") // Replace with your frontend domain
+        .AllowAnyHeader()
+        .AllowAnyMethod()));
+
+// --------------------
+// Build app
+// --------------------
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// --------------------
+// Middleware pipeline
+// --------------------
+app.UseSerilogRequestLogging();
+
+// If you are serving files locally (avatars, docs), keep this.
+// If moving entirely to cloud (Azure Blob / S3), remove it.
+app.UseStaticFiles();
+
+// Custom exception middleware
+app.UseMiddleware<ExceptionMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Ay API V1");
-    });
+    app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-
-app.UseMiddleware<ExceptionMiddleware>();
-
+app.UseCors("open");
 app.UseAuthentication();
-
 app.UseAuthorization();
 
 app.MapControllers();

@@ -1,99 +1,113 @@
-﻿using Common.AppSettings;
-using Common.Helpers;
-using Data.Data;
-using Data.Entities;
-using Microsoft.Extensions.Options;
+﻿using Data.Data;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using Service.Interfaces;
 using Service.Models.Authentication;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace Service.Implementation
 {
+    /// <summary>
+    /// Authentication service for handling user registration, login, 
+    /// password hashing, and JWT token creation.
+    /// </summary>
     public class AuthService : IAuthService
     {
         private readonly EcommercedbContext _db;
-        private readonly JwtViewModel _options;
+        private readonly IConfiguration _config;
 
-        public AuthService(EcommercedbContext db, IOptions<JwtViewModel> options)
+        public AuthService(EcommercedbContext db, IConfiguration config)
         {
             _db = db;
-            _options = options.Value;
+            _config = config;
         }
 
-        //LoginMethod to check Email and password from the database :
-        public AuthModel Login(UserLoginModel model)
+        /// <summary>
+        /// Registers a new user (if email does not already exist).
+        /// Returns new UserId or null if duplicate.
+        /// </summary>
+        public long? Register(RegisterRequest req)
         {
-            var roles = _db.TblUserRoles.ToList();
-            var user = _db.TblUsers.FirstOrDefault(c => c.Email.Equals(model.Email.ToLower()));
-            if (user is null)
-            {
-                return null;
-            }
+            var email = req.Email.Trim().ToLower();
 
-            bool verify = BCrypt.Net.BCrypt.Verify(model.Password, user.Password); //verify the encryptedPassword and UserInputPassword
-            if (!verify)
-            {
+            // Prevent duplicate registration
+            if (_db.Users.Any(x => x.Email == email && x.DeletedAt == null))
                 return null;
-            }
 
-            var token = JwtHelper.GenerateToken(_options, user); //generates jwtToken
-            return new AuthModel
+            var entity = new Data.Entities.User
             {
-                Email = user.Email,
-                Firstname = user.Firstname,
-                Lastname = user.Lastname,
-                Role = user?.RoleNavigation?.RoleName,
-                Token = token,
+                Firstname = req.Firstname.Trim(),
+                Lastname = req.Lastname.Trim(),
+                Email = email,
+                Password = Hash(req.Password),
+                Role = 1, // default = normal user
+                Status = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.Users.Add(entity);
+            _db.SaveChanges();
+            return entity.UserId;
+        }
+
+        /// <summary>
+        /// Attempts login with email & password.
+        /// Returns JWT AuthResponse or null if invalid.
+        /// </summary>
+        public AuthResponse? Login(LoginRequest request)
+        {
+            var email = request.Email.Trim().ToLower();
+
+            var user = _db.Users.FirstOrDefault(x => x.Email == email && x.DeletedAt == null);
+            if (user == null) return null;
+
+            if (!Verify(user.Password, request.Password)) return null;
+
+            // Build JWT
+            var jwt = _config.GetSection("Jwt");
+            var keyBytes = Encoding.UTF8.GetBytes(jwt["Key"] ?? throw new InvalidOperationException("JWT key missing"));
+            var key = new SymmetricSecurityKey(keyBytes);
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var claims = new List<Claim>
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+                new Claim(ClaimTypes.Name, $"{user.Firstname} {user.Lastname}"),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, (user.Role ?? 1).ToString())
+            };
+
+            var expires = DateTime.UtcNow.AddMinutes(int.TryParse(jwt["AccessTokenMinutes"], out var mins) ? mins : 60);
+
+            var token = new JwtSecurityToken(
+                issuer: jwt["Issuer"],
+                audience: jwt["Audience"],
+                claims: claims,
+                expires: expires,
+                signingCredentials: creds
+            );
+
+            return new AuthResponse
+            {
+                Token = new JwtSecurityTokenHandler().WriteToken(token),
+                ExpiresAt = expires,
+                UserId = user.UserId,
+                FullName = $"{user.Firstname} {user.Lastname}",
+                Role = user.Role
             };
         }
 
-        //Encrypt the normal password to encrypted format
-        public string EncryptedPassword(string? password)
-        {
-            var EncryptPassword = PasswordEncryption.EncryptedPassword(password);
-            return EncryptPassword ?? string.Empty;
-        }
+        /// <summary>
+        /// Hash password using BCrypt.
+        /// </summary>
+        public string Hash(string plain) => BCrypt.Net.BCrypt.HashPassword(plain);
 
-        //method for getting userdetail
-        public string GetUserDetail(long UserId)
-        {
-            var User = _db.TblUsers.Find(UserId);
-            if (User != null)
-            {
-                return User.Firstname + " " + User.Lastname;
-            }
-            else
-            {
-                return null;
-            }
-        }
-
-        //method for user registration
-        public string Registration(RegistrationModel model)
-        {
-            var user = _db.TblUsers.Any(x => x.Email.Equals(model.Email.ToLower()));
-            if (user == true)
-            {
-                return null;
-
-            }
-            var newuser = new TblUser();
-            {
-                newuser.Firstname = model.Firstname;
-                newuser.Lastname = model.Lastname;
-                newuser.Email = model.Email;
-                newuser.Password = BCrypt.Net.BCrypt.HashPassword(model.Password);
-                newuser.PhoneNumber = model.PhoneNumber;
-                newuser.Avatar = UserAvatar.AvatarUpload(model.Avatar);
-                newuser.Role = model.Role;
-                newuser.CountryId = model.CountryId;
-                newuser.CityId = model.CityId;
-            }
-
-            _db.TblUsers.Add(newuser);
-            _db.SaveChanges();
-
-            return "You Have Successfully Registered Yourself.You Can Login Now.";
-        }
-
+        /// <summary>
+        /// Verify password against hash using BCrypt.
+        /// </summary>
+        public bool Verify(string hash, string plain) => BCrypt.Net.BCrypt.Verify(plain, hash);
     }
 }
