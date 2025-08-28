@@ -1,6 +1,6 @@
-﻿using Common.Models;
+﻿using Common.Dtos;
 using Common.Helpers;
-using Data.Data;
+using Data.Context;
 using Data.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -8,8 +8,8 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Service.Interfaces;
-using Service.Models.User;
-using static Common.Models.PaginationModel;
+using Service.Dtos.User;
+using static Common.Dtos.PaginationParamsDto;
 
 namespace Service.Implementation
 {
@@ -18,14 +18,14 @@ namespace Service.Implementation
     /// </summary>
     public class UserService : IUserService
     {
-        private readonly EcommercedbContext _db;
+        private readonly UserHubDbContext _db;
         private readonly IMemoryCache _cache;
         private readonly IConfiguration _config;
         private readonly IFileService _files;
         private readonly ILogger<UserService> _logger;
 
         public UserService(
-            EcommercedbContext db,
+            UserHubDbContext db,
             IMemoryCache cache,
             IConfiguration config,
             IFileService files,
@@ -46,9 +46,9 @@ namespace Service.Implementation
         // ---------------------------
         // Get All Users (cached 5 min)
         // ---------------------------
-        public List<UserModel> GetUserDetails()
+        public List<UserResponseDto> GetUserDetails()
         {
-            if (_cache.TryGetValue(CacheKeys.UsersAll, out List<UserModel> cached))
+            if (_cache.TryGetValue(CacheKeys.UsersAll, out List<UserResponseDto> cached))
             {
                 _logger.LogInformation("Returned {Count} users from cache", cached.Count);
                 return cached;
@@ -67,12 +67,12 @@ namespace Service.Implementation
         }
 
         // ---------------------------
-        // Paged, Filtered & Sorted Users (cached 3 min)
+        // Paged, Filtered & Sorted Users (cached 5 min)
         // ---------------------------
-        public PagedResult<UserModel>? GetUsersPaged(PagedRequest q)
+        public PagedResult<UserResponseDto>? GetAllUsers(PagedRequest q)
         {
             var key = CacheKeys.UsersPaged(q.Page, q.Size, q.Search, q.SortBy, q.Desc);
-            if (_cache.TryGetValue(key, out PagedResult<UserModel> cached))
+            if (_cache.TryGetValue(key, out PagedResult<UserResponseDto> cached))
             {
                 _logger.LogInformation("Returned paged users from cache {Key}", key);
                 return cached;
@@ -80,7 +80,6 @@ namespace Service.Implementation
 
             var data = _db.Users.AsNoTracking().Where(x => x.DeletedAt == null);
 
-            // 🔍 Filtering
             if (!string.IsNullOrWhiteSpace(q.Search))
             {
                 var s = q.Search.Trim().ToLower();
@@ -90,7 +89,6 @@ namespace Service.Implementation
                     x.Lastname.ToLower().Contains(s));
             }
 
-            // ↕ Sorting
             if (!string.IsNullOrWhiteSpace(q.SortBy))
             {
                 bool desc = q.Desc;
@@ -100,7 +98,7 @@ namespace Service.Implementation
                     "lastname" => desc ? data.OrderByDescending(x => x.Lastname) : data.OrderBy(x => x.Lastname),
                     "email" => desc ? data.OrderByDescending(x => x.Email) : data.OrderBy(x => x.Email),
                     "createdat" => desc ? data.OrderByDescending(x => x.CreatedAt) : data.OrderBy(x => x.CreatedAt),
-                    _ => data.OrderBy(x => x.UserId) // default sort
+                    _ => data.OrderBy(x => x.UserId)
                 };
             }
 
@@ -111,7 +109,7 @@ namespace Service.Implementation
                 .Select(ToUserModel)
                 .ToList();
 
-            var result = new PagedResult<UserModel>
+            var result = new PagedResult<UserResponseDto>
             {
                 Page = q.Page,
                 Size = q.Size,
@@ -128,7 +126,7 @@ namespace Service.Implementation
         // ---------------------------
         // Add User
         // ---------------------------
-        public long? AddUser(AddUserModel model)
+        public long? AddUser(AddUserRequestDto model)
         {
             if (_db.Users.Any(u => u.Email == model.Email && u.DeletedAt == null))
                 return null;
@@ -148,7 +146,7 @@ namespace Service.Implementation
             _db.Users.Add(entity);
             _db.SaveChanges();
 
-            _cache.Remove(CacheKeys.UsersAll); // invalidate
+            _cache.Remove(CacheKeys.UsersAll);
             _logger.LogInformation("Added new user {UserId} and invalidated cache", entity.UserId);
 
             return entity.UserId;
@@ -157,16 +155,16 @@ namespace Service.Implementation
         // ---------------------------
         // Update User
         // ---------------------------
-        public ResponseModel UpdateUser(long userId, UpdateUserModel model)
+        public ApiResponseDto UpdateUser(long userId, UpdateUserRequestDto model)
         {
             var user = _db.Users.FirstOrDefault(x => x.UserId == userId && x.DeletedAt == null);
             if (user == null)
-                return new ResponseModel { Id = userId, StatusCode = 404, Message = "User Doesn't Exist!" };
+                return new ApiResponseDto { Id = userId, StatusCode = 404, Message = "User Doesn't Exist!" };
 
             if (!string.Equals(user.Email, model.Email, StringComparison.OrdinalIgnoreCase) &&
                 _db.Users.Any(x => x.Email == model.Email && x.DeletedAt == null))
             {
-                return new ResponseModel { StatusCode = 401, Message = "User Already Exist!" };
+                return new ApiResponseDto { StatusCode = 401, Message = "User Already Exist!" };
             }
 
             user.Firstname = model.Firstname;
@@ -181,7 +179,7 @@ namespace Service.Implementation
             _cache.Remove(CacheKeys.UsersAll);
 
             _logger.LogInformation("Updated user {UserId}", userId);
-            return new ResponseModel { Id = userId, StatusCode = 200, Message = "Updated" };
+            return new ApiResponseDto { Id = userId, StatusCode = 200, Message = "Updated" };
         }
 
         // ---------------------------
@@ -211,7 +209,6 @@ namespace Service.Implementation
 
             var rel = _files.SaveAvatar(file, AvatarsFolder);
 
-            // delete old avatar
             if (!string.IsNullOrWhiteSpace(user.Avatar))
             {
                 try { _files.DeleteFile(user.Avatar); }
@@ -231,7 +228,7 @@ namespace Service.Implementation
         // ---------------------------
         // Get User By Id
         // ---------------------------
-        public UserModel? GetUserDetailById(long userId)
+        public UserResponseDto? GetUserDetailById(long userId)
         {
             return _db.Users
                 .Where(x => x.UserId == userId && x.DeletedAt == null)
@@ -242,7 +239,7 @@ namespace Service.Implementation
         // ---------------------------
         // Helper: Map entity -> model
         // ---------------------------
-        private static UserModel ToUserModel(User x) => new UserModel
+        private static UserResponseDto ToUserModel(User x) => new UserResponseDto
         {
             UserId = x.UserId,
             Firstname = x.Firstname,

@@ -1,8 +1,8 @@
-﻿using Data.Data;
+﻿using Data.Context;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Service.Interfaces;
-using Service.Models.Authentication;
+using Service.Dtos.Authentication;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -15,10 +15,10 @@ namespace Service.Implementation
     /// </summary>
     public class AuthService : IAuthService
     {
-        private readonly EcommercedbContext _db;
+        private readonly UserHubDbContext _db;
         private readonly IConfiguration _config;
 
-        public AuthService(EcommercedbContext db, IConfiguration config)
+        public AuthService(UserHubDbContext db, IConfiguration config)
         {
             _db = db;
             _config = config;
@@ -32,7 +32,6 @@ namespace Service.Implementation
         {
             var email = req.Email.Trim().ToLower();
 
-            // Prevent duplicate registration
             if (_db.Users.Any(x => x.Email == email && x.DeletedAt == null))
                 return null;
 
@@ -42,7 +41,7 @@ namespace Service.Implementation
                 Lastname = req.Lastname.Trim(),
                 Email = email,
                 Password = Hash(req.Password),
-                Role = 1, // default = normal user
+                Role = 1,
                 Status = true,
                 CreatedAt = DateTime.UtcNow
             };
@@ -56,7 +55,7 @@ namespace Service.Implementation
         /// Attempts login with email & password.
         /// Returns JWT AuthResponse or null if invalid.
         /// </summary>
-        public AuthResponse? Login(LoginRequest request)
+        public AuthResponseDto? Login(LoginRequestDto request)
         {
             var email = request.Email.Trim().ToLower();
 
@@ -65,7 +64,6 @@ namespace Service.Implementation
 
             if (!Verify(user.Password, request.Password)) return null;
 
-            // Build JWT
             var jwt = _config.GetSection("Jwt");
             var keyBytes = Encoding.UTF8.GetBytes(jwt["Key"] ?? throw new InvalidOperationException("JWT key missing"));
             var key = new SymmetricSecurityKey(keyBytes);
@@ -90,7 +88,7 @@ namespace Service.Implementation
                 signingCredentials: creds
             );
 
-            return new AuthResponse
+            return new AuthResponseDto
             {
                 Token = new JwtSecurityTokenHandler().WriteToken(token),
                 ExpiresAt = expires,

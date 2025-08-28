@@ -1,7 +1,7 @@
-﻿using Common.Models;
+﻿using Common.Dtos;
 using Microsoft.AspNetCore.Http;
-using Service.Models.User;
-using static Common.Models.PaginationModel;
+using Service.Dtos.User;
+using static Common.Dtos.PaginationParamsDto;
 
 namespace Service.Interfaces
 {
@@ -18,20 +18,20 @@ namespace Service.Interfaces
         /// </summary>
         /// <param name="userId">The ID of the user.</param>
         /// <returns>User details if found, otherwise null.</returns>
-        UserModel? GetUserDetailById(long userId);
+        UserResponseDto? GetUserDetailById(long userId);
 
         /// <summary>
         /// Get details of all users.
         /// </summary>
         /// <returns>List of all users (empty list if none).</returns>
-        List<UserModel> GetUserDetails();
+        List<UserResponseDto> GetUserDetails();
 
         /// <summary>
         /// Add a new user.
         /// </summary>
         /// <param name="model">The user data to insert.</param>
         /// <returns>Newly created user ID, or null if already exists.</returns>
-        long? AddUser(AddUserModel model);
+        long? AddUser(AddUserRequestDto model);
 
         /// <summary>
         /// Update an existing user.
@@ -39,7 +39,7 @@ namespace Service.Interfaces
         /// <param name="userId">User ID to update.</param>
         /// <param name="model">New user data.</param>
         /// <returns>Response model with status and message.</returns>
-        ResponseModel UpdateUser(long userId, UpdateUserModel model);
+        ApiResponseDto UpdateUser(long userId, UpdateUserRequestDto model);
 
         /// <summary>
         /// Delete a user by ID.
@@ -57,7 +57,7 @@ namespace Service.Interfaces
         /// </summary>
         /// <param name="request">Paging and filter request (page, size, search, sort).</param>
         /// <returns>Paged result containing users and total count.</returns>
-        PagedResult<UserModel>? GetUsersPaged(PagedRequest request);
+        PagedResult<UserResponseDto>? GetAllUsers(PagedRequest request);
 
         #endregion
 

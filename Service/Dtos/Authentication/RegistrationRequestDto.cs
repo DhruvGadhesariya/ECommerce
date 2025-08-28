@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace Service.Models.Authentication
+namespace Service.Dtos.Authentication
 {
     /// <summary>
     /// DTO for user registration request.

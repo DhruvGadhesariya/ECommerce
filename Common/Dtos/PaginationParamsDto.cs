@@ -1,9 +1,9 @@
-﻿namespace Common.Models
+﻿namespace Common.Dtos
 {
     /// <summary>
     /// Common pagination request and response models.
     /// </summary>
-    public class PaginationModel
+    public class PaginationParamsDto
     {
         /// <summary>
         /// Request model for paged data queries.

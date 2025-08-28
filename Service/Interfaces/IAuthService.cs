@@ -1,4 +1,4 @@
-﻿using Service.Models.Authentication;
+﻿using Service.Dtos.Authentication;
 
 namespace Service.Interfaces
 {
@@ -15,7 +15,7 @@ namespace Service.Interfaces
         /// AuthResponse with JWT token, expiry, and user details if successful; 
         /// null if credentials are invalid.
         /// </returns>
-        AuthResponse? Login(LoginRequest request);
+        AuthResponseDto? Login(LoginRequestDto request);
 
         /// <summary>
         /// Register a new user.

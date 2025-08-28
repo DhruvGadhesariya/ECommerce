@@ -1,12 +1,12 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace Service.Models.Authentication
+namespace Service.Dtos.Authentication
 {
     /// <summary>
     /// DTO for user login request.
     /// Requires email and password fields.
     /// </summary>
-    public class LoginRequest
+    public class LoginRequestDto
     {
         /// <summary>
         /// User's email (required, must be a valid email address).

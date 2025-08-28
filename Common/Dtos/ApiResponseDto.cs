@@ -1,9 +1,9 @@
-﻿namespace Common.Models
+﻿namespace Common.Dtos
 {
     /// <summary>
     /// Standard API response wrapper.
     /// </summary>
-    public class ResponseModel
+    public class ApiResponseDto
     {
         /// <summary>
         /// Optional identifier of the entity involved in the response (e.g., UserId).

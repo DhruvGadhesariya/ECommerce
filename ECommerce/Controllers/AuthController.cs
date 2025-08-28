@@ -1,8 +1,9 @@
-﻿using Common.Models;
+﻿using Common.Dtos;
+using Common.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Service.Interfaces;
-using Service.Models.Authentication;
+using Service.Dtos.Authentication;
 using System.Security.Claims;
 
 namespace ECommerce.Controllers
@@ -22,6 +23,8 @@ namespace ECommerce.Controllers
             _authService = authService;
         }
 
+        #region Registration
+
         /// <summary>
         /// Registers a new user in the system.
         /// </summary>
@@ -31,10 +34,10 @@ namespace ECommerce.Controllers
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(new ResponseModel
+                return BadRequest(new ApiResponseDto
                 {
                     StatusCode = 400,
-                    Message = "Invalid request",
+                    Message = Messages.InvalidRequest,
                     Data = ModelState
                 });
             }
@@ -43,43 +46,47 @@ namespace ECommerce.Controllers
 
             if (id is null)
             {
-                return Conflict(new ResponseModel
+                return Conflict(new ApiResponseDto
                 {
                     StatusCode = 409,
-                    Message = "Email already exists"
+                    Message = Messages.EmailAlreadyExists
                 });
             }
 
-            return Ok(new ResponseModel
+            return Ok(new ApiResponseDto
             {
                 Id = id,
                 StatusCode = 200,
-                Message = "User registered successfully"
+                Message = Messages.UserRegistered
             });
         }
+
+        #endregion
+
+        #region Login
 
         /// <summary>
         /// Authenticates user and returns JWT token + claims.
         /// </summary>
         [AllowAnonymous]
         [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginRequest req)
+        public IActionResult Login([FromBody] LoginRequestDto req)
         {
             var token = _authService.Login(req);
 
             if (token is null)
             {
-                return Unauthorized(new AuthResponse
+                return Unauthorized(new AuthResponseDto
                 {
                     StatusCode = 401,
-                    Message = "Invalid credentials"
+                    Message = Messages.InvalidCredentials
                 });
             }
 
-            return Ok(new AuthResponse
+            return Ok(new AuthResponseDto
             {
                 StatusCode = 200,
-                Message = "Login successful",
+                Message = Messages.LoginSuccessful,
                 Token = token.Token,
                 ExpiresAt = token.ExpiresAt,
                 UserId = token.UserId,
@@ -87,6 +94,10 @@ namespace ECommerce.Controllers
                 Role = token.Role
             });
         }
+
+        #endregion
+
+        #region User Info
 
         /// <summary>
         /// Gets information about the currently logged-in user from JWT claims.
@@ -99,10 +110,10 @@ namespace ECommerce.Controllers
             var fullName = User.FindFirst(ClaimTypes.Name)?.Value;
             var role = User.FindFirst(ClaimTypes.Role)?.Value;
 
-            return Ok(new ResponseModel
+            return Ok(new ApiResponseDto
             {
                 StatusCode = 200,
-                Message = "User info retrieved",
+                Message = Messages.UserInfoRetrieved,
                 Data = new
                 {
                     UserId = userId,
@@ -111,5 +122,6 @@ namespace ECommerce.Controllers
                 }
             });
         }
+        #endregion
     }
 }

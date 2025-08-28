@@ -1,10 +1,10 @@
-﻿namespace Service.Models.User
+﻿namespace Service.Dtos.User
 {
     /// <summary>
     /// Represents a user with basic profile, contact, and account details.
     /// Used in responses (DTO).
     /// </summary>
-    public class UserModel
+    public class UserResponseDto
     {
         public long UserId { get; set; }
 

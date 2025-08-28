@@ -1,5 +1,5 @@
 ﻿using System.Text;
-using Data.Data;
+using Data.Context;
 using ECommerce.Middlewares;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +23,6 @@ builder.Services.AddControllers().AddNewtonsoftJson();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    // Swagger security definition for JWT
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
@@ -33,7 +32,6 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer"
     });
 
-    // Enforce JWT authentication in Swagger UI
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -53,8 +51,11 @@ builder.Services.AddSwaggerGen(c =>
 // --------------------
 // EF Core: Database Context
 // --------------------
-builder.Services.AddDbContext<EcommercedbContext>(opts =>
-    opts.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+builder.Services.AddDbContext<UserHubDbContext>((serviceProvider, options) =>
+{
+    var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+    options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
+});
 
 // --------------------
 // Caching
@@ -98,7 +99,7 @@ if (!string.IsNullOrEmpty(jwt["Key"]))
 // --------------------
 builder.Services.AddCors(o =>
     o.AddPolicy("open", p => p
-        .WithOrigins("https://your-frontend.com") // Replace with your frontend domain
+        .WithOrigins("https://your-frontend.com") //Our actual FE domain
         .AllowAnyHeader()
         .AllowAnyMethod()));
 
@@ -111,10 +112,6 @@ var app = builder.Build();
 // Middleware pipeline
 // --------------------
 app.UseSerilogRequestLogging();
-
-// If you are serving files locally (avatars, docs), keep this.
-// If moving entirely to cloud (Azure Blob / S3), remove it.
-app.UseStaticFiles();
 
 // Custom exception middleware
 app.UseMiddleware<ExceptionMiddleware>();

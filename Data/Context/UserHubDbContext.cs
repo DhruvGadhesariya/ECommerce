@@ -1,21 +1,21 @@
 ﻿using Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
-namespace Data.Data
+namespace Data.Context
 {
     /// <summary>
     /// Entity Framework Core database context for the E-Commerce system.
     /// Handles Users, Roles, and Addresses.
     /// </summary>
-    public partial class EcommercedbContext : DbContext
+    public partial class UserHubDbContext : DbContext
     {
-        public EcommercedbContext()
-        {
-        }
+        private readonly IConfiguration _configuration;
 
-        public EcommercedbContext(DbContextOptions<EcommercedbContext> options)
-            : base(options)
+        public UserHubDbContext(DbContextOptions<UserHubDbContext> options, IConfiguration configuration)
+        : base(options)
         {
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         }
 
         // -------------------------
@@ -29,8 +29,11 @@ namespace Data.Data
         {
             if (!optionsBuilder.IsConfigured)
             {
-                // ⚠️ Suggestion: Move connection string to appsettings.json instead of hardcoding.
-                optionsBuilder.UseSqlServer("Data Source=PCA118\\SQL2017;DataBase=ECOMMERCEDb;User ID=sa;Password=Tatva@123;encrypt=false");
+                if (_configuration == null)
+                    throw new InvalidOperationException("IConfiguration is not provided to the DbContext.");
+
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                optionsBuilder.UseSqlServer(connectionString);
             }
         }
 
@@ -58,7 +61,7 @@ namespace Data.Data
                     .IsUnicode(false);
 
                 entity.HasIndex(e => e.Email)
-                    .IsUnique(); // ✅ Enforce unique email
+                    .IsUnique();
 
                 entity.Property(e => e.Password)
                     .HasMaxLength(255)

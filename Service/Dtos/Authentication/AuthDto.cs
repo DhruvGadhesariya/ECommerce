@@ -1,10 +1,10 @@
-﻿namespace Service.Models.Authentication
+﻿namespace Service.Dtos.Authentication
 {
     /// <summary>
     /// Represents a simplified authentication response model
     /// with basic user info and issued JWT token.
     /// </summary>
-    public class AuthModel
+    public class AuthDto
     {
         /// <summary>
         /// User's first name.

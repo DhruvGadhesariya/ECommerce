@@ -1,13 +1,19 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace Service.Models.User
+namespace Service.Dtos.User
 {
     /// <summary>
-    /// DTO used for creating a new user.
-    /// Includes validation rules enforced via data annotations.
+    /// DTO used for updating an existing user's details.
+    /// Validated via data annotations before processing in the controller.
     /// </summary>
-    public class AddUserModel
+    public class UpdateUserRequestDto
     {
+        /// <summary>
+        /// Unique identifier of the user to update.
+        /// </summary>
+        [Required]
+        public long UserId { get; set; }
+
         /// <summary>
         /// User's first name (max 16 characters).
         /// </summary>
@@ -21,17 +27,10 @@ namespace Service.Models.User
         public string Lastname { get; set; } = string.Empty;
 
         /// <summary>
-        /// User's email address (must be valid format, max 255 characters).
+        /// User's email address (max 255 characters, must be valid format).
         /// </summary>
         [Required, EmailAddress, StringLength(255)]
         public string Email { get; set; } = string.Empty;
-
-        /// <summary>
-        /// User's password (required, min 6 characters).
-        /// Should be securely hashed before storage.
-        /// </summary>
-        [Required, StringLength(255, MinimumLength = 6)]
-        public string Password { get; set; } = string.Empty;
 
         /// <summary>
         /// User's phone number (optional, validated by PhoneAttribute).
@@ -44,5 +43,10 @@ namespace Service.Models.User
         /// Stored as byte but should ideally map to <see cref="Common.Enums.Roles"/>.
         /// </summary>
         public byte? Role { get; set; }
+
+        /// <summary>
+        /// User status (true = active, false = inactive).
+        /// </summary>
+        public bool? Status { get; set; }
     }
 }

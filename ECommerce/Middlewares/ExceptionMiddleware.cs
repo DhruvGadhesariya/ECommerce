@@ -26,7 +26,6 @@ namespace ECommerce.Middlewares
             }
             catch (Exception ex)
             {
-                // Log error with request details
                 _logger.LogError(ex,
                     "Unhandled exception occurred while processing request {Method} {Path}",
                     httpContext.Request.Method, httpContext.Request.Path);
@@ -42,15 +41,14 @@ namespace ECommerce.Middlewares
         {
             var code = HttpStatusCode.InternalServerError;
 
-            // Customize certain known exceptions if required
             if (exception is UnauthorizedAccessException) code = HttpStatusCode.Unauthorized;
             else if (exception is ArgumentException) code = HttpStatusCode.BadRequest;
 
             var result = JsonConvert.SerializeObject(new
             {
                 StatusCode = (int)code,
-                Message = exception.Message, // For production, you may prefer: "An internal error occurred."
-                Detail = exception.GetType().Name // Optional: helps debugging without exposing stack trace
+                Message = exception.Message,
+                Detail = exception.GetType().Name
             });
 
             context.Response.ContentType = "application/json";

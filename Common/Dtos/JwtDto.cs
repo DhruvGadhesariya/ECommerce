@@ -1,9 +1,9 @@
-﻿namespace Common.Models
+﻿namespace Common.Dtos
 {
     /// <summary>
     /// Holds JWT configuration values, usually mapped from appsettings.json (Jwt section).
     /// </summary>
-    public class JwtViewModel
+    public class JwtDto
     {
         /// <summary>
         /// Secret key used to sign the JWT token (must be kept safe).

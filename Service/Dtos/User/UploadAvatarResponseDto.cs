@@ -1,10 +1,10 @@
-﻿namespace Service.Models.User
+﻿namespace Service.Dtos.User
 {
     /// <summary>
     /// Response model for user avatar upload.
     /// Contains both the stored relative path and a full URL for client access.
     /// </summary>
-    public class UploadAvatarResponse
+    public class UploadAvatarResponseDto
     {
         /// <summary>
         /// Path relative to the server's storage (e.g., "uploads/avatars/user1.png").

@@ -1,13 +1,13 @@
-﻿using Common.Models;
+﻿using Common.Dtos;
 
-namespace Service.Models.Authentication
+namespace Service.Dtos.Authentication
 {
     /// <summary>
     /// Authentication response model.
-    /// Inherits from <see cref="ResponseModel"/> for consistent API responses.
+    /// Inherits from <see cref="ApiResponseDto"/> for consistent API responses.
     /// Contains JWT token details and user info.
     /// </summary>
-    public class AuthResponse : ResponseModel
+    public class AuthResponseDto : ApiResponseDto
     {
         /// <summary>
         /// JWT bearer token issued after successful authentication.
